@@ -8,7 +8,7 @@ import {
   getAuth,
   EmailAuthProvider,
   signOut,
-  onAuthStateChanged
+  onAuthStateChanged,
 } from 'firebase/auth';
 
 import {
@@ -17,7 +17,7 @@ import {
   collection,
   query,
   orderBy,
-  onSnapshot
+  onSnapshot,
 } from 'firebase/firestore';
 
 import * as firebaseui from 'firebaseui';
@@ -70,15 +70,15 @@ async function main() {
     credentialHelper: firebaseui.auth.CredentialHelper.NONE,
     signInOptions: [
       // Email / Password Provider.
-      EmailAuthProvider.PROVIDER_ID
+      EmailAuthProvider.PROVIDER_ID,
     ],
     callbacks: {
-      signInSuccessWithAuthResult: function(authResult, redirectUrl) {
+      signInSuccessWithAuthResult: function (authResult, redirectUrl) {
         // Handle sign-in.
         // Return false to avoid redirect.
         return false;
-      }
-    }
+      },
+    },
   };
 
   const ui = new firebaseui.auth.AuthUI(getAuth());
@@ -95,20 +95,24 @@ async function main() {
   });
 
   // Listen to the current Auth state
-  onAuthStateChanged(auth, user => {
+  onAuthStateChanged(auth, (user) => {
     if (user) {
       startRsvpButton.textContent = 'LOGOUT';
       // Show guestbook to logged-in users
       guestbookContainer.style.display = 'block';
+      // Subscribe to the guestbook collection
+      subscribeGuestbook();
     } else {
       startRsvpButton.textContent = 'RSVP';
       // Hide guestbook for non-logged-in users
       guestbookContainer.style.display = 'none';
+      // Unsubscribe from the guestbook collection
+      unsubscribeGuestbook();
     }
   });
 
   // Listen to the form submission
-  form.addEventListener('submit', async e => {
+  form.addEventListener('submit', async (e) => {
     // Prevent the default form redirect
     e.preventDefault();
     // Write a new message to the database collection "guestbook"
@@ -116,7 +120,7 @@ async function main() {
       text: input.value,
       timestamp: Date.now(),
       name: auth.currentUser.displayName,
-      userId: auth.currentUser.uid
+      userId: auth.currentUser.uid,
     });
     // clear message input field
     input.value = '';
@@ -124,18 +128,28 @@ async function main() {
     return false;
   });
 
-  // Create query for messages
-  const q = query(collection(db, 'guestbook'), orderBy('timestamp', 'desc'));
-  onSnapshot(q, snaps => {
-    // Reset page
-    guestbook.innerHTML = '';
-    // Loop through documents in database
-    snaps.forEach(doc => {
-      // Create an HTML entry for each document and add it to the chat
-      const entry = document.createElement('p');
-      entry.textContent = doc.data().name + ': ' + doc.data().text;
-      guestbook.appendChild(entry);
+  // Listen to guestbook updates
+  function subscribeGuestbook() {
+    const q = query(collection(db, 'guestbook'), orderBy('timestamp', 'desc'));
+    guestbookListener = onSnapshot(q, (snaps) => {
+      // Reset page
+      guestbook.innerHTML = '';
+      // Loop through documents in database
+      snaps.forEach((doc) => {
+        // Create an HTML entry for each document and add it to the chat
+        const entry = document.createElement('p');
+        entry.textContent = doc.data().name + ': ' + doc.data().text;
+        guestbook.appendChild(entry);
+      });
     });
-  });
+  }
+
+  // Unsubscribe from guestbook updates
+  function unsubscribeGuestbook() {
+    if (guestbookListener != null) {
+      guestbookListener();
+      guestbookListener = null;
+    }
+  }
 }
 main();
